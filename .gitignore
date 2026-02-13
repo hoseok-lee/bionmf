@@ -1,0 +1,8 @@
+# Build-time generated
+example_data/
+build/
+figures/
+bionmf.egg-info/
+__pycache__
+.DS_Store
+main.py
