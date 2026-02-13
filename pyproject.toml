@@ -14,7 +14,3 @@ dependencies = [
 ]
 description = "NMF solver for gene programs."
 readme = "README.md"
-
-[tool.setuptools]
-packages = ["bionmf"]
-py-modules = ["__init__"]
