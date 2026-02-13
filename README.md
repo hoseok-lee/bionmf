@@ -1,7 +1,7 @@
 # Installation
 
 ```bash
-$ pip install .
+$ pip install bionmf
 ```
 
 # Usage
