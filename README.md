@@ -30,9 +30,9 @@ BioNMF(
     random_state,               # Initial random state
     **kwargs                    # Rest of arguments are passed to sklearn.decomposition.NMF
 ).fit(
-    adata,                      # Accepts AnnData, DataFrame or sparse matrix (cells as rows)
+    adata,                      # Accepts AnnData and DataFrame (must be cells as rows)
     rank_range,                 # Range of rank values to test
-    n_runs,                     # Number of runs (random intializations) for each tested rank
+    n_runs,                     # Number of runs (random intializations) for each rank
     cutoff,                     # Cophenetic correlation cutoff
 )                               # -> returns NMFInfo object
 
