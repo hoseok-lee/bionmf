@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=63"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bionmf"
+version = "0.0.1"
+dependencies = [
+    "scanpy",
+    "scikit-learn",
+    "multiprocess",
+    "pytest",
+    "fastcluster"
+]
+description = "NMF solver for gene programs."
+readme = "README.md"
+
+[tool.setuptools]
+packages = ["bionmf"]
+py-modules = ["__init__"]
