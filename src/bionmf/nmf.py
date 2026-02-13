@@ -16,7 +16,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 
-from .utils import sparse_rmse, log2_deg
+from .utils import sparse_rmse, log2_deg, connectivity_matrix
 
 
 class BioNMF:
@@ -32,7 +32,7 @@ class BioNMF:
         cophcorr: float
 
         @property
-        def cell_states(self):
+        def programs(self):
             return np.argmax(self.H, axis = 0)
 
 
@@ -174,7 +174,7 @@ class BioNMF:
 
                 # Cell state connectivity
                 cell_states = np.argmax(H_, axis = 0)
-                conns += BioNMF.connectivity_matrix(cell_states)
+                conns += connectivity_matrix(cell_states)
 
                 # Although it is ugly, minimizes number of loops
                 # Update best fitting NMF
@@ -259,63 +259,72 @@ class BioNMF:
             plt.savefig(save)
 
 
-    def plot_heatmap(
+    def program_genes(
         self,
-        save: Optional[str] = None
+        pval_cutoff: Optional[float] = None,
     ):
 
-        cell_states = pd.Series(
+        programs = pd.Series(
             # Best NMF from fitting
             self.nmf_runs[self.rank] \
-                .cell_states \
+                .programs \
                 .astype(str),
 
             index = self.adata.obs_names,
-            name = "State"
+            name = "NMF Program"
         ).sort_values()
 
         # Organize genes based on differential expression per state
         results = defaultdict(pd.DataFrame)
 
-        for cell_state, df in log2_deg(
+        for program, df in log2_deg(
             self.adata,
-            groupby = cell_states
+            groupby = programs
         ):
 
             df = df[df['foldchange'] > 0]
-            results[cell_state] = df
+            if pval_cutoff: # Cutoff for significance threshold
+                df = df[df['pvals_adj'] < pval_cutoff]
+            results[program] = df
 
-        df = pd.concat(
+        return pd.concat(
             results.values(),
             axis = 0,
             keys = results,
-            names = ['cell_state', 'genes']
+            names = ['program', 'genes']
         )
 
+
+    def plot_heatmap(
+        self,
+        save: Optional[str] = None
+    ):
+
+        df = self.program_genes()
         self.adata = self.adata[
             :, df \
                 .reset_index() \
                 .loc[lambda x: x.groupby(by = "genes")['foldchange'].idxmax()] \
-                .sort_values(by = "cell_state")['genes']
+                .sort_values(by = "program")['genes']
         ]
 
         # Columns sorted by cell state
         # The reason for doing this operation after the genes is to make the
         # check at line 258 (index equality check) more efficient
-        self.adata = self.adata[cell_states.index, :]
+        self.adata = self.adata[programs.index, :]
 
         lut = dict(
             zip(
-                cell_states.unique(),
+                programs.unique(),
                 plt.get_cmap('Set1')(
                     np.linspace(
                         0, 1,
-                        cell_states.nunique()
+                        programs.nunique()
                     )
                 )
             )
         )
-        col_colors = cell_states.map(lut)
+        col_colors = programs.map(lut)
 
         plt.clf()
         g = sns.clustermap(
@@ -330,8 +339,7 @@ class BioNMF:
             col_cluster = False,
             col_colors = col_colors,
             cbar_pos = (0.09, 0.2, 0.03, 0.4),
-            figsize = (5.5, 5),
-            square = True
+            figsize = (5.5, 5)
         )
 
         # Remove axes
@@ -355,12 +363,12 @@ class BioNMF:
                     (0, 0),
                     1, 1,
                     fc = color,
-                    label = f"S{cell_state}"
+                    label = f"NMF{program}"
                 )
-                for cell_state, color in lut.items()
+                for program, color in lut.items()
             ],
-            list(map(lambda x: f"S{x}", lut)),
-            title = 'Cell State',
+            list(map(lambda x: f"NMF{x}", lut)),
+            title = 'NMF Program',
             loc = 'center',
             bbox_to_anchor = (0.5, 0.6),
             frameon = False,
@@ -374,28 +382,3 @@ class BioNMF:
             plt.savefig(save)
 
         return df
-
-
-    @staticmethod
-    def assign_states(data: np.ndarray | NMFInfo):
-
-        # Extract H
-        if isinstance(data, BioNMF.NMFInfo):
-            data = data.H
-
-        return np.argmax(data, axis = 0)
-
-
-    @staticmethod
-    def connectivity_matrix(X):
-
-        return sum(
-            # x(i) is True if belong to cluster i
-            # Matrix multiplication computes to 1 if (i, j) is both True
-            np.matmul(x.T, x)
-
-            for cluster in range(X.max() + 1)
-            # For each cluster membership
-            # Skip if there are no elements of a certain cluster
-            if (x := (X == cluster).reshape(1, -1)).any()
-        )

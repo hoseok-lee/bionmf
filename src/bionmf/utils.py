@@ -8,6 +8,20 @@ import scanpy as sc
 import pandas as pd
 
 
+def connectivity_matrix(X):
+
+    return sum(
+        # x(i) is True if belong to cluster i
+        # Matrix multiplication computes to 1 if (i, j) is both True
+        np.matmul(x.T, x)
+
+        for cluster in range(X.max() + 1)
+        # For each cluster membership
+        # Skip if there are no elements of a certain cluster
+        if (x := (X == cluster).reshape(1, -1)).any()
+    )
+
+
 def sparse_rmse(A, B) -> float:
 
     return np.sqrt(
@@ -17,54 +31,19 @@ def sparse_rmse(A, B) -> float:
     )
 
 
-def idx_sample_top(
-    adata: ad.AnnData,
-    by: str,
-    n_cells: int,
-    raw: bool = False,
-    random_state: int = 0
-) -> ad.AnnData:
-
-    # Return original object if set to 0
-    if n_cells == 0:
-        return adata
-
-    df = adata.obs
-
-    if raw:
-        df.reset_index(inplace = True)
-
-    return df \
-        .sample(frac = 1, random_state = random_state) \
-        .groupby(by) \
-        .head(n_cells) \
-        .index
-
-
-def log2_norm(A: sp.spmatrix) -> sp.spmatrix:
-
-    # EcoTyper uses base2 log
-    # log1p --> zscore
-    return sp.csr_matrix(
-        sc.pp.scale(
-            sc.pp.log1p(A, base = 2)
-        )
-    )
-
-
 def log2_deg(
     adata: ad.AnnData,
     groupby: str | list,
-    obs_subset: pd.Index = slice(None),
-    var_subset: pd.Index = slice(None),
     n_jobs: int = 1
 ):
 
     from scipy.stats import false_discovery_control
     from scanpy.tools._rank_genes_groups import _RankGenes
+    from scanpy.pp import log1p, scale
 
-    # Subset and log2 + z-scale
-    # subset = self.adata[obs_subset, var_subset]
+    # log2 + z-scale
+    log1p(adata, base = 2)
+    scale(adata)
     sp_mat = adata.X
 
     # Passed raw data as annotations
