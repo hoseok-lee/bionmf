@@ -50,6 +50,7 @@ class BioNMF:
 
         self.random_state = random_state
         self.nmf_runs = defaultdict(self.NMFInfo)
+        self.best_nmf = None
 
         # Default NMF solver arguments
         self.nmf_kwargs = {
@@ -124,7 +125,7 @@ class BioNMF:
     def _fit_check(self):
 
         # Check if the model was fit at all
-        if len(self.nmf_runs) == 0:
+        if self.best_nmf is None:
             raise ValueError(
                 "Please make sure to fit the model on at least one NMF rank and"
                 "one run with BioNMF.fit()"
@@ -204,14 +205,23 @@ class BioNMF:
 
         # Choose rank based on Brunet et al method
         self.rank = self._select_rank(self.nmf_runs, cutoff = cutoff)
+        self.best_nmf = self.nmf_runs[self.rank]
 
-        return self.nmf_runs[self.rank]
+        # Store in AnnData object
+        self.adata.obsm['X_nmf'] = self.best_nmf.H.T
+        self.adata.varm['factors'] = self.best_nmf.W
+
+        return self.best_nmf
+
+
+    def get_adata(self) -> AnnData:
+        return self.adata
 
 
     def plot_cophcorr(
         self,
         save: Optional[str] = None
-    ):
+    ) -> None:
 
         self._fit_check()
 
@@ -262,7 +272,7 @@ class BioNMF:
     def program_genes(
         self,
         pval_cutoff: Optional[float] = None,
-    ):
+    ) -> pd.DataFrame:
 
         programs = pd.Series(
             # Best NMF from fitting
@@ -298,7 +308,7 @@ class BioNMF:
     def plot_heatmap(
         self,
         save: Optional[str] = None
-    ):
+    ) -> None:
 
         df = self.program_genes()
         self.adata = self.adata[
@@ -380,5 +390,3 @@ class BioNMF:
 
         if save:
             plt.savefig(save)
-
-        return df
