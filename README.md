@@ -24,7 +24,7 @@ adata.varm['factors']           # Stores gene-factors under .varm['factors']
 genes = model.program_genes()   # Get differential expressed genes per program
 
 model.plot_cophcorr("coph.png") # Cophenetic correlation for each tested rank
-model.plot_heatmap("hm.png")    # Heaetmap of gene programs
+model.plot_heatmap("hm.png")    # Heatmap of gene programs
 ```
 
 # Documentation
