@@ -15,6 +15,7 @@ import pandas as pd
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import altair as alt
 
 from .utils import sparse_rmse, log2_deg, connectivity_matrix
 
@@ -204,7 +205,7 @@ class BioNMF:
             )
 
         # Choose rank based on Brunet et al method
-        self.rank = self._select_rank(self.nmf_runs, cutoff = cutoff)
+        self.rank = self._select_rank(self.nmf_runs, cutoff = self.cutoff)
         self.best_nmf = self.nmf_runs[self.rank]
 
         # Store in AnnData object
@@ -225,48 +226,63 @@ class BioNMF:
 
         self._fit_check()
 
-        # Cophenetic coefficient
-        plt.clf()
-        plt.plot(
-            self.nmf_runs.keys(),
+        df = pd.DataFrame(
             [
-                self.nmf_runs[rank].cophcorr
+                [ rank, self.nmf_runs[rank].cophcorr ]
                 for rank in self.nmf_runs
             ],
-            marker = 'o',
-            color = 'black',
-            linestyle = '-',
-            label = "Cophenetic Coefficient"
+            columns = [ "rank", "cophcorr" ]
         )
 
-        # Cutoff point
-        plt.axhline(
-            y = self.cutoff,
-            color = 'black',
-            linestyle = '--',
-            label = "Cophenetic Cutoff"
+        line = (
+            alt.Chart(df)
+            .mark_line(point = True)
+            .encode(
+                x = alt.X(
+                    "rank",
+                    axis    = alt.Axis(grid = False),
+                ),
+                y = alt.Y(
+                    "cophcorr",
+                    axis    = alt.Axis(grid = False),
+                    scale   = alt.Scale(zero = False)
+                ),
+                color = alt.value("black")
+            )
         )
 
-        # Selected rank
-        plt.axvline(
-            x = self.rank,
-            color = 'red',
-            linestyle = '--',
-            label = "Selected Rank"
+        # Horizontal line indicating cophenetic cutoff
+        cutoff = (
+            alt.Chart(pd.DataFrame({'_': [ self.cutoff ]}))
+            .mark_rule(strokeDash = [5, 5])
+            .encode(
+                y = alt.Y("_", axis = alt.Axis(title = "Cophenetic Correlation")),
+                color = alt.value("black")
+            )
         )
 
-        plt.xlabel("Rank")
-        plt.ylabel("Cophenetic Coefficient")
+        # vertical line indicating selected rank
+        rank = (
+            alt.Chart(pd.DataFrame({'_': [ self.rank ]}))
+            .mark_rule(strokeDash = [5, 5])
+            .encode(
+                x = alt.X(
+                    "_",
+                    axis = alt.Axis(
+                        tickCount = len(df),
+                        format = "d",
+                        title = "Rank"
+                    )
+                ),
+                color = alt.value("red")
+            )
+        )
 
-        # This is strictly to avoid floating point values being labeled for
-        # x-ticks --> force them to be integers
-        plt.xticks(list(map(int, self.nmf_runs)))
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
+        # Layer all the chart components
+        chart = (line + cutoff + rank).properties(width = 300, height = 300)
 
         if save:
-            plt.savefig(save)
+            chart.save(save, scale_factor = 3)
 
 
     def program_genes(
@@ -305,88 +321,128 @@ class BioNMF:
         )
 
 
-    def plot_heatmap(
-        self,
-        save: Optional[str] = None
-    ) -> None:
+    # def plot_heatmap(
+    #     self,
+    #     save: Optional[str] = None
+    # ) -> None:
 
-        df = self.program_genes()
-        self.adata = self.adata[
-            :, df \
-                .reset_index() \
-                .loc[lambda x: x.groupby(by = "genes")['foldchange'].idxmax()] \
-                .sort_values(by = "program")['genes']
-        ]
+    #     programs = pd.Series(
+    #         # Best NMF from fitting
+    #         self.nmf_runs[self.rank] \
+    #             .programs \
+    #             .astype(str),
 
-        # Columns sorted by cell state
-        # The reason for doing this operation after the genes is to make the
-        # check at line 258 (index equality check) more efficient
-        self.adata = self.adata[programs.index, :]
+    #         index = self.adata.obs_names,
+    #         name = "State"
+    #     ).sort_values()
 
-        lut = dict(
-            zip(
-                programs.unique(),
-                plt.get_cmap('Set1')(
-                    np.linspace(
-                        0, 1,
-                        programs.nunique()
-                    )
-                )
-            )
-        )
-        col_colors = programs.map(lut)
+    #     df = self.program_genes()
+    #     self.adata = self.adata[
+    #         :, df \
+    #             .reset_index() \
+    #             .loc[lambda x: x.groupby(by = "genes")['foldchange'].idxmax()] \
+    #             .sort_values(by = "program")['genes']
+    #     ]
 
-        plt.clf()
-        g = sns.clustermap(
-            self.adata.to_df().T,
-            cmap = 'bwr',
-            z_score = 0,
-            center = 0,
-            vmin = -2, vmax = 2,
-            xticklabels = False,
-            yticklabels = False,
-            row_cluster = False,
-            col_cluster = False,
-            col_colors = col_colors,
-            cbar_pos = (0.09, 0.2, 0.03, 0.4),
-            figsize = (5.5, 5)
-        )
+    #     # Columns sorted by cell state
+    #     # The reason for doing this operation after the genes is to make the
+    #     # check at line 258 (index equality check) more efficient
+    #     self.adata = self.adata[programs.index, :]
+    #     df = self.adata \
+    #         .to_df() \
+    #         .reset_index() \
+    #         .melt(id_vars = "index")
 
-        # Remove axes
-        g.ax_heatmap.set_xticklabels([])
-        g.ax_heatmap.set_yticklabels([])
-        g.ax_heatmap.set_xlabel("")
-        g.ax_heatmap.set_ylabel("")
+    #     chart = (
+    #         alt.Chart(df)
+    #         .mark_rect()
+    #         .encode(
+    #             x       = alt.X(
+    #                 "index:O",
+    #                 title   = None,
+    #                 axis    = None
+    #             ),
+    #             y       = alt.Y(
+    #                 "variable:O",
+    #                 title   = None,
+    #                 axis    = None
+    #             ),
+    #             color   = alt.Color(
+    #                 "value",
+    #                 title   = "value",
+    #                 legend  = alt.Legend(title = None)
+    #             )
+    #         )
+    #         .properties(width = 400, height = 400)
+    #     )
 
-        x0, *_ = g.cbar_pos
-        g.ax_cbar.set_title(
-            "Relative Expression",
-            rotation = 90,
-            x = x0 - 1.2,
-            y = 0.15,
-            fontsize = 10
-        )
+    #     if save:
+    #         chart.save(save)
 
-        g.ax_col_dendrogram.legend(
-            [
-                plt.Rectangle(
-                    (0, 0),
-                    1, 1,
-                    fc = color,
-                    label = f"NMF{program}"
-                )
-                for program, color in lut.items()
-            ],
-            list(map(lambda x: f"NMF{x}", lut)),
-            title = 'NMF Program',
-            loc = 'center',
-            bbox_to_anchor = (0.5, 0.6),
-            frameon = False,
-            ncol = min(5, len(lut))
-        )
+        # lut = dict(
+        #     zip(
+        #         programs.unique(),
+        #         plt.get_cmap('Set1')(
+        #             np.linspace(
+        #                 0, 1,
+        #                 programs.nunique()
+        #             )
+        #         )
+        #     )
+        # )
+        # col_colors = programs.map(lut)
 
-        plt.tight_layout()
-        plt.show()
+        # plt.clf()
+        # g = sns.clustermap(
+        #     self.adata.to_df().T,
+        #     cmap = 'bwr',
+        #     z_score = 0,
+        #     center = 0,
+        #     vmin = -2, vmax = 2,
+        #     xticklabels = False,
+        #     yticklabels = False,
+        #     row_cluster = False,
+        #     col_cluster = False,
+        #     col_colors = col_colors,
+        #     cbar_pos = (0.09, 0.2, 0.03, 0.4),
+        #     figsize = (5.5, 5)
+        # )
 
-        if save:
-            plt.savefig(save)
+        # # Remove axes
+        # g.ax_heatmap.set_xticklabels([])
+        # g.ax_heatmap.set_yticklabels([])
+        # g.ax_heatmap.set_xlabel("")
+        # g.ax_heatmap.set_ylabel("")
+
+        # x0, *_ = g.cbar_pos
+        # g.ax_cbar.set_title(
+        #     "Relative Expression",
+        #     rotation = 90,
+        #     x = x0 - 1.2,
+        #     y = 0.15,
+        #     fontsize = 10
+        # )
+
+        # g.ax_col_dendrogram.legend(
+        #     [
+        #         plt.Rectangle(
+        #             (0, 0),
+        #             1, 1,
+        #             fc = color,
+        #             label = f"NMF{program}"
+        #         )
+        #         for program, color in lut.items()
+        #     ],
+        #     list(map(lambda x: f"NMF{x}", lut)),
+        #     title = 'NMF Program',
+        #     loc = 'center',
+        #     bbox_to_anchor = (0.5, 0.6),
+        #     frameon = False,
+        #     ncol = min(5, len(lut))
+        # )
+
+        # plt.tight_layout()
+        # plt.show()
+
+        # if save:
+        #     plt.savefig(save)

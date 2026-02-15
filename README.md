@@ -18,13 +18,11 @@ nmf = model.fit(                # NMFInfo object, see below for properties
 )
 
 adata = model.get_adata()       # Return AnnData object
-adata.obsm['X_nmf']             # Stores cell-factors under .obsm['X_nmf']
-adata.varm['factors']           # Stores gene-factors under .varm['factors']
+                                # Stores cell-factors under .obsm['X_nmf']
+                                # Stores gene-factors under .varm['factors']
 
 genes = model.program_genes()   # Get differential expressed genes per program
-
-model.plot_cophcorr("coph.png") # Cophenetic correlation for each tested rank
-model.plot_heatmap("hm.png")    # Heatmap of gene programs
+model.plot_cophcorr("cc.html")  # Cophenetic correlation for each tested rank
 ```
 
 # Documentation
@@ -49,3 +47,7 @@ NMFInfo(                        # Properties accessed as nmf.rank, nmf.W, etc.
     cophcorr                    # Cophenetic correlation
 )
 ```
+
+# References
+
+Brunet JP, Tamayo P, Golub TR, Mesirov JP. Metagenes and molecular pattern discovery using matrix factorization. Proc Natl Acad Sci U S A. 2004 Mar 23;101(12):4164-9. doi: 10.1073/pnas.0308531101. Epub 2004 Mar 11. PMID: 15016911; PMCID: PMC384712.

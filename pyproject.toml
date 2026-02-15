@@ -10,7 +10,9 @@ dependencies = [
     "scikit-learn",
     "multiprocess",
     "pytest",
-    "fastcluster"
+    "fastcluster",
+    "altair",
+    "vl-convert-python"
 ]
 description = "NMF solver for gene programs."
 readme = "README.md"
