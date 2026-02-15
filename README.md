@@ -30,7 +30,7 @@ model.plot_cophcorr("cc.html")  # Cophenetic correlation for each tested rank
 ```python
 BioNMF(
     random_state,               # Initial random state
-    **kwargs                    # Rest of arguments are passed to sklearn.decomposition.NMF
+    **kwargs                    # Arguments for sklearn.decomposition.NMF
 ).fit(
     adata,                      # Accepts AnnData and DataFrame (must be cells as rows)
     rank_range,                 # Range of rank values to test
